@@ -15,13 +15,12 @@ MotionVisor::MotionVisor(): timer(TIM3)
     timer.setOverflow(100, MICROSEC_FORMAT);
     timer.attachInterrupt(std::bind(&MotionVisor::stepperAsyncLoop, this));
     timer.resume();
-    
 }
 
 void MotionVisor::stepperAsyncLoop()
 {
     static int cnt = 0;
-    unsigned long delay = (stepPermm / speed) * 10000;
+    unsigned long delay = (config.stepPermm / config.speed) * 10000;
     signed long softStart = 500 - currentStep;
     signed long softStop = 500 - (goalStep - currentStep);
     if(softStart < 0) softStart = 0;
@@ -67,22 +66,22 @@ void MotionVisor::loop()
 
 unsigned long MotionVisor::mmToStep(double mm)
 {
-    return (double)(length / stepPermm);
+    return (double)(config.length / config.stepPermm);
 }
 
 void MotionVisor::open()
 {
-    digitalWrite(dirPin, invertDir ? HIGH : LOW);
+    digitalWrite(dirPin, config.invertDir ? HIGH : LOW);
     currentStep = 0;
-    goalStep = mmToStep(length);
+    goalStep = mmToStep(config.length);
     _state = MotionVisorState::Opening;
 }
 
 void MotionVisor::close()
 {
-    digitalWrite(dirPin, invertDir ? LOW : HIGH);
+    digitalWrite(dirPin, config.invertDir ? LOW : HIGH);
     currentStep = 0;
-    goalStep = mmToStep(length + maxCompensation); // compensate for missed steps 
+    goalStep = mmToStep(config.length + config.maxCompensation); // compensate for missed steps 
     _state = MotionVisorState::Closing;
 }
 
@@ -91,12 +90,12 @@ void MotionVisor::autoHome()
 
 }
 
-void MotionVisor::init()
+void MotionVisor::setConfig(const MotionVisorConfig &config)
 {
-    
+    this->config = config;
 }
 
 bool MotionVisor::isAtEndstop()
 {
-    return invertEndstopPin ? !digitalRead(endstopPin) : digitalRead(endstopPin);
+    return config.invertEndstopPin ? !digitalRead(endstopPin) : digitalRead(endstopPin);
 }

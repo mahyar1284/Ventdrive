@@ -1,5 +1,6 @@
 #pragma once
 #include "MotionVisorState.hpp"
+#include "MotionVisorConfig.hpp"
 #include <arduino.h>
 #include <HardwareTimer.h>
 
@@ -9,7 +10,7 @@ public:
     MotionVisor();
     ~MotionVisor();
 
-    void init();
+    void setConfig(const MotionVisorConfig &config);
     void open();
     void close();
     void autoHome();
@@ -25,7 +26,6 @@ private:
     HardwareTimer timer;
     MotionVisorState _state = MotionVisorState::Error;
     int dirPin = PC14, stepPin = PC15, enPin = PB4, endstopPin = PB5;
-    bool invertDir = false, invertEndstopPin = false;
-    double stepPermm = 0.005, speed = 8, length = 30, maxCompensation = 5;
+    MotionVisorConfig config;
     long currentStep = 0, goalStep = 0;
 };

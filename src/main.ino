@@ -7,7 +7,6 @@ void setup()
     pinMode(PC13, OUTPUT);
     digitalWrite(PC13, LOW); // onboard LED on
     MotionVisor motionVisor;
-    motionVisor.init();
     if(motionVisor.state() == MotionVisorState::Closed)
         motionVisor.open();
     if(motionVisor.state() == MotionVisorState::Opened)
