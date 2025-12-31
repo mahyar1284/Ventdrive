@@ -19,7 +19,7 @@ void setup()
     {
         // Parse or route the JSON; return a response string
         // For demo, echo with an ack field
-        return std::string("{\"ack\":true,\"received\":") + json + "}";
+        return std::string("ok!!!!\n");
     });
 
     fusionBus.begin();
@@ -47,7 +47,7 @@ void setup()
         // if(motionVisor.state() == MotionVisorState::Error)
         //     Serial.println("state: Error");
         // sSerial.println("LOOP\n");
-        delay(1);
+        //delay(1);
     }
 }
 void loop() {}
