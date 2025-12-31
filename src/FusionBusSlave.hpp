@@ -20,10 +20,10 @@ public:
     };
 
     struct Timeouts {
-        unsigned long primaryTriggerMs   = 1000;
-        unsigned long commandTriggerMs   = 1000;
-        unsigned long jsonStartMs        = 1000;
-        unsigned long jsonCompleteMs     = 3000;
+        unsigned long primaryTriggerMs   = 100;
+        unsigned long commandTriggerMs   = 100;
+        unsigned long jsonStartMs        = 100;
+        unsigned long jsonCompleteMs     = 1000;
     };
 
     FusionBusSlave(std::string deviceType = "Ventdrive",
@@ -46,8 +46,6 @@ public:
     void loop() {
         while (serial_.available()) {
             const char c = static_cast<char>(serial_.read());
-            Serial.print("[FusionBusSlave] Received char: ");
-            Serial.println(c);
             processChar(c);
         }
         checkTimeouts();
