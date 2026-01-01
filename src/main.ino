@@ -3,9 +3,11 @@
 #include "MotionVisor.hpp"
 #include "FusionBusSlave.hpp"
 #include "HardwareSerial.h"
+#include <ArduinoJson.h>
 
 void setup() 
 {
+    delay(500); // startup delay
     Serial.begin(115200);
     Serial.println("Application Starting...");
     Serial.println("Firmware: Baremetal ARM Cortex Processor");
@@ -14,28 +16,56 @@ void setup()
     Serial.println("Description: Motorized Greenhouse Vent Controller");
     Serial.println("Driver: A4988");
     Serial.println("Development Date: early 2026");
+    Serial.println("UUID: 123456789"); // UUID for device identification
+    Serial.println("------------------------------------------\n\n");
     
-    FusionBusSlave fusionBus("Ventdrive", [](const std::string& json) -> std::string 
+    MotionVisor motionVisor;
+    MotionVisorConfig mvConfig();
+    FusionBusSlave fusionBus("Ventdrive", [&](const std::string& json) -> std::string 
     {
-        // Parse or route the JSON; return a response string
-        // For demo, echo with an ack field
-        return std::string("ok!!!!\n");
-    });
-
+        // parse and check json validity using ArduinoJson c++
+        JsonDocument doc;
+        if(deserializeJson(doc, json) == DeserializationError::Ok) // successful parse (valid json)
+        {
+            // process json commands
+            if(doc["UUID"].as<uint32_t>() == 123456789) // if UUID Matches,
+            {
+                std::string command = doc["command"].as<std::string>();
+                Serial.println(command.c_str());
+                if(command == "close")
+                {
+                    // close the visor
+                    motionVisor.close();
+                    return std::string("Closing visor...\n");
+                }
+                else if(command == "open")
+                {
+                    // open the visor
+                    motionVisor.open();
+                    return std::string("Opening visor...\n");
+                }
+                else
+                {
+                    return std::string("Error: Unknown command\n");
+                }
+            }
+        }
+        return std::string("");
+    }); 
     fusionBus.begin();
 
+    // if(motionVisor.state() == MotionVisorState::Closed)
+    //     motionVisor.open();
+    // if(motionVisor.state() == MotionVisorState::Opened)
+    //     motionVisor.close();
+    
     pinMode(PC13, OUTPUT);
     digitalWrite(PC13, LOW); // onboard LED on
-    MotionVisor motionVisor;
-    if(motionVisor.state() == MotionVisorState::Closed)
-        motionVisor.open();
-    if(motionVisor.state() == MotionVisorState::Opened)
-        motionVisor.close();
     while(true)
     {
         fusionBus.loop();
         motionVisor.loop();
-
+        digitalToggle(PC13);
         // if(motionVisor.state() == MotionVisorState::Closed)
         //     Serial.println("state: Closed");
         // if(motionVisor.state() == MotionVisorState::Opened)
