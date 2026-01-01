@@ -7,11 +7,13 @@
 #include <cstring>
 #include <HardwareSerial.h>
 
-class FusionBusSlave {
+class FusionBusSlave 
+{
 public:
     using Callback = std::function<std::string(const std::string&)>;
 
-    enum class State {
+    enum class State 
+    {
         Idle,           // Waiting for "FusionBus"
         WaitCommand,    // After "FusionBus", waiting for "Pair" or "Communicate"
         WaitJsonStart,  // After "FusionBusCommunicate", waiting for '{'
@@ -19,7 +21,8 @@ public:
         Respond         // Sending response (Pair or callback result)
     };
 
-    struct Timeouts {
+    struct Timeouts 
+    {
         unsigned long primaryTriggerMs   = 100;
         unsigned long commandTriggerMs   = 100;
         unsigned long jsonStartMs        = 100;
@@ -34,7 +37,8 @@ public:
           onCommunicate_(std::move(onCommunicate))
     {}
 
-    void begin(unsigned long baud = 115200) {
+    void begin(unsigned long baud = 115200) 
+    {
         serial_.begin(baud);
         USART1->CR3 |= USART_CR3_HDSEL;
         serial_.println("TEST!!!");
@@ -43,8 +47,10 @@ public:
         Serial.println("[FusionBusSlave] begin() called, state reset to Idle");
     }
 
-    void loop() {
-        while (serial_.available()) {
+    void loop() 
+    {
+        while (serial_.available()) 
+        {
             const char c = static_cast<char>(serial_.read());
             processChar(c);
         }
@@ -53,15 +59,18 @@ public:
         isDiscoverable_ = !digitalRead(PB12);
     }
 
-    void setCallback(Callback cb) {
+    void setCallback(Callback cb) 
+    {
         onCommunicate_ = std::move(cb);
     }
 
-    void setDeviceType(std::string type) {
+    void setDeviceType(std::string type) 
+    {
         deviceType_ = std::move(type);
     }
 
-    void setTimeouts(const Timeouts& t) {
+    void setTimeouts(const Timeouts& t) 
+    {
         timeouts_ = t;
     }
 
@@ -87,8 +96,10 @@ private:
     static constexpr const char* kPair    = "Pair";
     static constexpr const char* kComm    = "Communicate";
 
-    void processChar(char c) {
-        switch (state_) {
+    void processChar(char c) 
+    {
+        switch (state_) 
+        {
             case State::Idle:          handleIdle(c); break;
             case State::WaitCommand:   handleWaitCommand(c); break;
             case State::WaitJsonStart: handleWaitJsonStart(c); break;
@@ -97,31 +108,40 @@ private:
         }
     }
 
-    void handleIdle(char c) {
+    void handleIdle(char c) 
+    {
         if (std::isspace(static_cast<unsigned char>(c))) return;
         tokenBuffer_.push_back(c);
 
-        if (startsWith(kPrimary)) {
-            if (tokenBuffer_.size() == std::strlen(kPrimary)) {
+        if (startsWith(kPrimary)) 
+        {
+            if (tokenBuffer_.size() == std::strlen(kPrimary)) 
+            {
                 Serial.println("[FusionBusSlave] Primary trigger matched: FusionBus");
                 transition(State::WaitCommand);
                 tokenBuffer_.clear();
             }
-        } else {
-            if (c == kPrimary[0]) {
+        } else 
+        {
+            if (c == kPrimary[0]) 
+            {
                 tokenBuffer_.assign(1, c);
-            } else {
+            } else 
+            {
                 tokenBuffer_.clear();
             }
         }
     }
 
-    void handleWaitCommand(char c) {
+    void handleWaitCommand(char c) 
+    {
         if (std::isspace(static_cast<unsigned char>(c))) return;
         tokenBuffer_.push_back(c);
 
-        if (startsWith(kPair) and isDiscoverable_) {
-            if (tokenBuffer_.size() == std::strlen(kPair)) {
+        if (startsWith(kPair) and isDiscoverable_) 
+        {
+            if (tokenBuffer_.size() == std::strlen(kPair)) 
+            {
                 Serial.println("[FusionBusSlave] Command trigger matched: Pair");
                 const auto uuid = makeUuid();
                 pendingResponse_ = std::string("{\"uuid\":\"") + uuid +
@@ -131,26 +151,34 @@ private:
                 tokenBuffer_.clear();
                 return;
             }
-        } else if (startsWith(kComm)) {
-            if (tokenBuffer_.size() == std::strlen(kComm)) {
+        } else if (startsWith(kComm)) 
+        {
+            if (tokenBuffer_.size() == std::strlen(kComm)) 
+            {
                 Serial.println("[FusionBusSlave] Command trigger matched: Communicate");
                 transition(State::WaitJsonStart);
                 tokenBuffer_.clear();
                 return;
             }
-        } else {
-            if (c == kPair[0]) {
+        } else 
+        {
+            if (c == kPair[0]) 
+            {
                 tokenBuffer_.assign(1, c);
-            } else if (c == kComm[0]) {
+            } else if (c == kComm[0]) 
+            {
                 tokenBuffer_.assign(1, c);
-            } else {
+            } else 
+            {
                 tokenBuffer_.clear();
             }
         }
     }
 
-    void handleWaitJsonStart(char c) {
-        if (c == '{') {
+    void handleWaitJsonStart(char c) 
+    {
+        if (c == '{') 
+        {
             Serial.println("[FusionBusSlave] JSON start detected");
             jsonBuffer_.clear();
             jsonBuffer_.push_back(c);
@@ -159,19 +187,25 @@ private:
         }
     }
 
-    void handleCaptureJson(char c) {
+    void handleCaptureJson(char c) 
+    {
         jsonBuffer_.push_back(c);
-        if (c == '{') {
+        if (c == '{') 
+        {
             ++braceDepth_;
-        } else if (c == '}') {
+        } else if (c == '}') 
+        {
             --braceDepth_;
-            if (braceDepth_ <= 0) {
+            if (braceDepth_ <= 0) 
+            {
                 Serial.print("[FusionBusSlave] JSON captured: ");
                 Serial.println(jsonBuffer_.c_str());
-                if (onCommunicate_) {
+                if (onCommunicate_) 
+                {
                     pendingResponse_ = onCommunicate_(jsonBuffer_);
                     hasPendingResponse_ = true;
-                } else {
+                } else 
+                {
                     pendingResponse_ = jsonBuffer_;
                     hasPendingResponse_ = true;
                 }
@@ -180,17 +214,20 @@ private:
         }
     }
 
-    bool startsWith(const char* target) const {
+    bool startsWith(const char* target) const 
+    {
         const size_t n = tokenBuffer_.size();
         const size_t m = std::strlen(target);
         if (n > m) return false;
-        for (size_t i = 0; i < n; ++i) {
+        for (size_t i = 0; i < n; ++i) 
+        {
             if (tokenBuffer_[i] != target[i]) return false;
         }
         return true;
     }
 
-    void transition(State next) {
+    void transition(State next) 
+    {
         Serial.print("[FusionBusSlave] Transition: ");
         Serial.print(static_cast<int>(state_));
         Serial.print(" -> ");
@@ -199,7 +236,8 @@ private:
         stateStartMs_ = millis();
     }
 
-    void reset() {
+    void reset() 
+    {
         Serial.println("[FusionBusSlave] Resetting state to Idle");
         state_ = State::Idle;
         tokenBuffer_.clear();
@@ -210,29 +248,35 @@ private:
         stateStartMs_ = millis();
     }
 
-    void checkTimeouts() {
+    void checkTimeouts() 
+    {
         const unsigned long now = millis();
-        switch (state_) {
+        switch (state_) 
+        {
             case State::Idle:
-                if (elapsed(now) > timeouts_.primaryTriggerMs) {
+                if (elapsed(now) > timeouts_.primaryTriggerMs) 
+                {
                     tokenBuffer_.clear();
                     stateStartMs_ = now;
                 }
                 break;
             case State::WaitCommand:
-                if (elapsed(now) > timeouts_.commandTriggerMs) {
+                if (elapsed(now) > timeouts_.commandTriggerMs) 
+                {
                     Serial.println("[FusionBusSlave] Timeout in WaitCommand");
                     reset();
                 }
                 break;
             case State::WaitJsonStart:
-                if (elapsed(now) > timeouts_.jsonStartMs) {
+                if (elapsed(now) > timeouts_.jsonStartMs) 
+                {
                     Serial.println("[FusionBusSlave] Timeout waiting for JSON start");
                     reset();
                 }
                 break;
             case State::CaptureJson:
-                if (elapsed(now) > timeouts_.jsonCompleteMs) {
+                if (elapsed(now) > timeouts_.jsonCompleteMs) 
+                {
                     Serial.println("[FusionBusSlave] Timeout capturing JSON");
                     reset();
                 }
@@ -242,12 +286,15 @@ private:
         }
     }
 
-    unsigned long elapsed(unsigned long now) const {
+    unsigned long elapsed(unsigned long now) const 
+    {
         return now - stateStartMs_;
     }
 
-    void flushRespondIfPending() {
-        if (state_ == State::Respond && hasPendingResponse_) {
+    void flushRespondIfPending() 
+    {
+        if (state_ == State::Respond && hasPendingResponse_) 
+        {
             Serial.print("[FusionBusSlave] Sending response: ");
             Serial.println(pendingResponse_.c_str());
             serial_.println(pendingResponse_.c_str());
@@ -257,7 +304,8 @@ private:
         }
     }
 
-    std::string makeUuid() const {
+    std::string makeUuid() const 
+    {
         const uint32_t a = millis();
         const uint32_t b = micros();
         const uintptr_t p = reinterpret_cast<uintptr_t>(this);
