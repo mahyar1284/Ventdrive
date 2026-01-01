@@ -20,7 +20,6 @@ void setup()
     Serial.println("------------------------------------------\n\n");
     
     MotionVisor motionVisor;
-    MotionVisorConfig mvConfig();
     FusionBusSlave fusionBus("Ventdrive", [&](const std::string& json) -> std::string 
     {
         // parse and check json validity using ArduinoJson c++
@@ -30,7 +29,11 @@ void setup()
             // process json commands
             if(doc["UUID"].as<uint32_t>() == 123456789) // if UUID Matches,
             {
-                std::string command = doc["command"].as<std::string>();
+                auto mvConfig = MotionVisorConfig();
+                doc.containsKey("speed") ? mvConfig.speed = doc["speed"].as<double>() : NULL;
+                doc.containsKey("length") ? mvConfig.length = doc["length"].as<double>() : NULL;
+                motionVisor.setConfig(mvConfig);
+                std::string command = doc["command"].as<std::string>();                
                 Serial.println(command.c_str());
                 if(command == "close")
                 {
