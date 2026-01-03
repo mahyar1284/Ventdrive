@@ -4,11 +4,12 @@
 #include "FusionBusSlave.hpp"
 #include "HardwareSerial.h"
 #include <ArduinoJson.h>
+#include <optional>
 
 void setup() 
 {
     delay(500); // startup delay
-    Serial.begin(115200);
+    Serial.begin(38400);
     Serial.println("Application Starting...");
     Serial.println("Firmware: Baremetal ARM Cortex Processor");
     Serial.println("Developer: Mahyar Shokraeian");
@@ -19,43 +20,65 @@ void setup()
     Serial.println("UUID: 123456789"); // UUID for device identification
     Serial.println("------------------------------------------\n\n");
     
+    pinMode(PB12, INPUT_PULLUP); // pairing and discovery button.
     MotionVisor motionVisor;
-    FusionBusSlave fusionBus("Ventdrive", [&](const std::string& json) -> std::string 
+    // motionVisor.autoHome();
+    FusionBusSlave fusionBus("Ventdrive");
+    fusionBus.onCommunicate([&](const std::string& json) -> std::optional<std::string>
     {
         // parse and check json validity using ArduinoJson c++
         JsonDocument doc;
         if(deserializeJson(doc, json) == DeserializationError::Ok) // successful parse (valid json)
         {
             // process json commands
-            if(doc["UUID"].as<uint32_t>() == 123456789) // if UUID Matches,
+            if(doc["UUID"].as<uint32_t>() == 123456789) // Only process if UUID Matches,
             {
-                auto mvConfig = MotionVisorConfig();
+                auto mvConfig = motionVisor.getConfig();
+                doc.containsKey("acceleration") ? mvConfig.acceleration = doc["acceleration"].as<double>() : NULL;
                 doc.containsKey("speed") ? mvConfig.speed = doc["speed"].as<double>() : NULL;
                 doc.containsKey("length") ? mvConfig.length = doc["length"].as<double>() : NULL;
                 motionVisor.setConfig(mvConfig);
-                std::string command = doc["command"].as<std::string>();                
-                Serial.println(command.c_str());
-                if(command == "close")
-                {
-                    // close the visor
-                    motionVisor.close();
-                    return std::string("Closing visor...\n");
-                }
-                else if(command == "open")
-                {
-                    // open the visor
-                    motionVisor.open();
-                    return std::string("Opening visor...\n");
-                }
+                
+                JsonDocument responseDoc;
+                if(motionVisor.state() == MotionVisorState::Closing)
+                    responseDoc["state"] = "Closing";
+                if(motionVisor.state() == MotionVisorState::Opening)
+                    responseDoc["state"] = "Opening";
+                if(motionVisor.state() == MotionVisorState::Idle)
+                    responseDoc["state"] = "Idle";
+                if(motionVisor.state() == MotionVisorState::Error)
+                    responseDoc["state"] = "Error";
+                
+                if(motionVisor.ventingPercent().has_value())
+                    responseDoc["ventingPercent"] = motionVisor.ventingPercent().value();
                 else
-                {
-                    return std::string("Error: Unknown command\n");
-                }
+                    responseDoc["ventingPercent"] = nullptr;
+                std::string response;
+                serializeJsonPretty(responseDoc, response);
+
+                if(doc.containsKey("ventingPercent"))
+                    motionVisor.setVentingPercent(doc["ventingPercent"].as<int>());
+                if((doc["autoHomeFlag"] | false) == true)
+                    motionVisor.autoHome();
+                return response;
             }
         }
-        return std::string("");
+        return std::nullopt;
     }); 
-    fusionBus.begin();
+    fusionBus.onPair([&]() -> std::optional<std::string> 
+    {
+        if(!digitalRead(PB12)) // if pairing button is pushed
+        {
+            const auto uuid = 123456789;
+            JsonDocument doc;
+            doc["UUID"] = uuid;
+            std::string response;
+            serializeJson(doc, response);
+            return response;
+        }
+        return std::nullopt;
+    });
+    fusionBus.begin(38400);
 
     // if(motionVisor.state() == MotionVisorState::Closed)
     //     motionVisor.open();

@@ -4,8 +4,7 @@ enum class MotionVisorState
 {
     Closing,
     Opening,
-    Opened,
-    Closed,
-    CrackedOpen,
-    Error
+    Idle,
+    Error,
+    Uninitialized
 };

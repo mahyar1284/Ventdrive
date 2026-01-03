@@ -6,12 +6,11 @@
 #include <cstdint>
 #include <cstring>
 #include <HardwareSerial.h>
+#include <optional>
 
 class FusionBusSlave 
 {
 public:
-    using Callback = std::function<std::string(const std::string&)>;
-
     enum class State 
     {
         Idle,           // Waiting for "FusionBus"
@@ -20,6 +19,8 @@ public:
         CaptureJson,    // Capturing JSON until matching '}'
         Respond         // Sending response (Pair or callback result)
     };
+    using Callback = std::function<std::optional<std::string>(const std::string&)>;
+    using PairingCallback = std::function<std::optional<std::string>()>;
 
     struct Timeouts 
     {
@@ -41,9 +42,8 @@ public:
     {
         serial_.begin(baud);
         USART1->CR3 |= USART_CR3_HDSEL;
-        serial_.println("TEST!!!");
+        serial_.println("abcdefghijklmnopqrstuvwxyz1234567890{}[]()!@#$%^&*~,.-_/''<>ABCDEFGHIJKLMNOPQRSTUVWXYZ");
         reset();
-        pinMode(PB12, INPUT_PULLUP);
         Serial.println("[FusionBusSlave] begin() called, state reset to Idle");
     }
 
@@ -56,12 +56,16 @@ public:
         }
         checkTimeouts();
         flushRespondIfPending();
-        isDiscoverable_ = !digitalRead(PB12);
     }
 
-    void setCallback(Callback cb) 
+    void onCommunicate(Callback cb) 
     {
         onCommunicate_ = std::move(cb);
+    }
+
+    void onPair(PairingCallback cb) 
+    {
+        onPair_ = std::move(cb);
     }
 
     void setDeviceType(std::string type) 
@@ -79,6 +83,7 @@ private:
     std::string deviceType_;
     Timeouts timeouts_;
     Callback onCommunicate_;
+    PairingCallback onPair_;
 
     State state_ = State::Idle;
 
@@ -90,7 +95,6 @@ private:
 
     std::string pendingResponse_;
     bool hasPendingResponse_ = false;
-    bool isDiscoverable_ = false;
 
     static constexpr const char* kPrimary = "FusionBus";
     static constexpr const char* kPair    = "Pair";
@@ -138,17 +142,26 @@ private:
         if (std::isspace(static_cast<unsigned char>(c))) return;
         tokenBuffer_.push_back(c);
 
-        if (startsWith(kPair) and isDiscoverable_) 
+        if (startsWith(kPair)) 
         {
             if (tokenBuffer_.size() == std::strlen(kPair)) 
             {
                 Serial.println("[FusionBusSlave] Command trigger matched: Pair");
-                const auto uuid = makeUuid();
-                pendingResponse_ = std::string("{\"uuid\":\"") + uuid +
-                                   "\", \"type\":\"" + deviceType_ + "\"}";
-                hasPendingResponse_ = true;
-                transition(State::Respond);
-                tokenBuffer_.clear();
+                if (onPair_) 
+                {
+                    auto optResponse = onPair_();
+                    if(optResponse.has_value())
+                    {
+                        pendingResponse_ = optResponse.value();
+                        hasPendingResponse_ = true;
+                        delay(1); // wait 1ms to avoid bus collision
+                        transition(State::Respond);
+                    }
+                    else
+                    {
+                        reset();
+                    }
+                }
                 return;
             }
         } else if (startsWith(kComm)) 
@@ -202,14 +215,19 @@ private:
                 Serial.println(jsonBuffer_.c_str());
                 if (onCommunicate_) 
                 {
-                    pendingResponse_ = onCommunicate_(jsonBuffer_);
-                    hasPendingResponse_ = true;
-                } else 
-                {
-                    pendingResponse_ = jsonBuffer_;
-                    hasPendingResponse_ = true;
+                    auto optResponse = onCommunicate_(jsonBuffer_);
+                    if(optResponse.has_value())
+                    {
+                        pendingResponse_ = optResponse.value();
+                        hasPendingResponse_ = true;
+                        delay(1); // wait 1ms to avoid bus collision
+                        transition(State::Respond);
+                    }
+                    else
+                    {
+                        reset();
+                    }
                 }
-                transition(State::Respond);
             }
         }
     }
