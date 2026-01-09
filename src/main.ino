@@ -17,7 +17,7 @@ void setup()
     Serial.println("Description: Motorized Greenhouse Vent Controller");
     Serial.println("Driver: A4988");
     Serial.println("Development Date: early 2026");
-    Serial.println("UUID: 123456789"); // UUID for device identification
+    Serial.println("id: 123456789"); // id for device identification
     Serial.println("------------------------------------------\n\n");
     
     pinMode(PB12, INPUT_PULLUP); // pairing and discovery button.
@@ -31,12 +31,17 @@ void setup()
         if(deserializeJson(doc, json) == DeserializationError::Ok) // successful parse (valid json)
         {
             // process json commands
-            if(doc["UUID"].as<uint32_t>() == 123456789) // Only process if UUID Matches,
+            if(doc["id"].as<uint32_t>() == 123456789) // Only process if id Matches,
             {
                 auto mvConfig = motionVisor.getConfig();
-                doc.containsKey("acceleration") ? mvConfig.acceleration = doc["acceleration"].as<double>() : NULL;
-                doc.containsKey("speed") ? mvConfig.speed = doc["speed"].as<double>() : NULL;
-                doc.containsKey("length") ? mvConfig.length = doc["length"].as<double>() : NULL;
+                if(doc.containsKey("acceleration")) mvConfig.acceleration = doc["acceleration"].as<double>();
+                if(doc.containsKey("speed")) mvConfig.speed = doc["speed"].as<double>();
+                if(doc.containsKey("length")) mvConfig.length = doc["length"].as<double>();
+                if(doc.containsKey("stepPermm")) mvConfig.stepPermm = doc["stepPermm"].as<double>();
+                if(doc.containsKey("maxCompensation")) mvConfig.maxCompensation = doc["maxCompensation"].as<double>();
+                if(doc.containsKey("endstopMinDistance")) mvConfig.endstopMinDistance = doc["endstopMinDistance"].as<double>();
+                if(doc.containsKey("ventingPercent")) motionVisor.setVentingPercent(doc["ventingPercent"].as<int>());
+                if((doc["autoHomeFlag"] | false) == true) motionVisor.autoHome();
                 motionVisor.setConfig(mvConfig);
                 
                 JsonDocument responseDoc;
@@ -48,18 +53,17 @@ void setup()
                     responseDoc["state"] = "Idle";
                 if(motionVisor.state() == MotionVisorState::Error)
                     responseDoc["state"] = "Error";
+                if(motionVisor.state() == MotionVisorState::Uninitialized)
+                    responseDoc["state"] = "Uninitialized";
                 
                 if(motionVisor.ventingPercent().has_value())
                     responseDoc["ventingPercent"] = motionVisor.ventingPercent().value();
                 else
                     responseDoc["ventingPercent"] = nullptr;
+                responseDoc["type"] = "VentDrive";
                 std::string response;
                 serializeJsonPretty(responseDoc, response);
 
-                if(doc.containsKey("ventingPercent"))
-                    motionVisor.setVentingPercent(doc["ventingPercent"].as<int>());
-                if((doc["autoHomeFlag"] | false) == true)
-                    motionVisor.autoHome();
                 return response;
             }
         }
@@ -69,9 +73,10 @@ void setup()
     {
         if(!digitalRead(PB12)) // if pairing button is pushed
         {
-            const auto uuid = 123456789;
+            const auto id = 123456789;
             JsonDocument doc;
-            doc["UUID"] = uuid;
+            doc["id"] = id;
+            doc["type"] = "VentDrive";
             std::string response;
             serializeJson(doc, response);
             return response;
