@@ -154,7 +154,7 @@ private:
                     {
                         pendingResponse_ = optResponse.value();
                         hasPendingResponse_ = true;
-                        delay(1); // wait 1ms to avoid bus collision
+                        delay(10); // wait 10ms to avoid bus collision
                         transition(State::Respond);
                     }
                     else
@@ -220,7 +220,7 @@ private:
                     {
                         pendingResponse_ = optResponse.value();
                         hasPendingResponse_ = true;
-                        delay(1); // wait 1ms to avoid bus collision
+                        delay(10); // wait 10ms to avoid bus collision
                         transition(State::Respond);
                     }
                     else
