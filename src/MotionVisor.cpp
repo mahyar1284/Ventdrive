@@ -6,6 +6,7 @@ MotionVisor::MotionVisor(): timer(TIM3)
     pinMode(endstopPin, INPUT_PULLDOWN);
     pinMode(stepPin, OUTPUT);
     pinMode(dirPin, OUTPUT);
+    pinMode(enPin, OUTPUT);
 
     timer.setOverflow(100, MICROSEC_FORMAT);
     timer.attachInterrupt(std::bind(&MotionVisor::stepperAsyncLoop, this));
@@ -18,21 +19,32 @@ void MotionVisor::stepperAsyncLoop()
     {
         static int cnt;
         unsigned long delay = (unsigned long)(10000.0 / (config.speed * config.stepPermm));
-        // signed long softStart = 500 - std::abs(goalStep);
+        digitalWrite(enPin, LOW);
         digitalWrite(dirPin, config.invertDir ? LOW : HIGH);
         if(cnt++ > delay)
         {
             if(goalStep < 0 and !isAtEndstop())
             {
                 goalStep ++;
-                digitalToggle(stepPin); // rotate 1 step
+                digitalWrite(stepPin, HIGH); // rotate 1 step
+                digitalWrite(stepPin, LOW); // rotate 1 step
             }
             else 
             {
-                _state = MotionVisorState::Idle;
-                currentStep = 0;
-                goalStep = 0;
-                autoHomeFlag = false;
+                if(isAtEndstop())
+                {
+                    _state = MotionVisorState::Idle;
+                    currentStep = 0;
+                    goalStep = 0;
+                    autoHomeFlag = false;
+                }
+                else
+                {
+                    _state = MotionVisorState::Error;
+                    currentStep = std::nullopt;
+                    goalStep = 0;
+                    autoHomeFlag = false;
+                }
             }
             cnt = 0;
         }
@@ -40,27 +52,41 @@ void MotionVisor::stepperAsyncLoop()
     else if(currentStep.has_value())
     {
         static int cnt = 0;
-
         // base delay in ticks
         unsigned long delay = (unsigned long)(10000.0 / (config.speed * config.stepPermm));
         //auto delay = computeDelayTicks(goalStep, currentStep.value(), totalDistSteps, config.speed, config.stepPermm, config.acceleration);
 
         if(cnt++ > delay) {
-            if(currentStep.value() < goalStep) {
+            if(currentStep.value() < goalStep) 
+            {
+                digitalWrite(enPin, LOW);
                 digitalWrite(dirPin, config.invertDir ? HIGH : LOW);
-                digitalToggle(stepPin);
+                digitalWrite(stepPin, HIGH); // rotate 1 step
+                digitalWrite(stepPin, LOW); // rotate 1 step
                 currentStep = currentStep.value() + 1;
                 _state = MotionVisorState::Opening;
-            } else if(currentStep.value() > goalStep) {
+            } else if(currentStep.value() > goalStep) 
+            {
+                digitalWrite(enPin, LOW);
                 digitalWrite(dirPin, config.invertDir ? LOW : HIGH);
-                digitalToggle(stepPin);
+                digitalWrite(stepPin, HIGH); // rotate 1 step
+                digitalWrite(stepPin, LOW); // rotate 1 step
                 currentStep = currentStep.value() - 1;
                 _state = MotionVisorState::Closing;
-            } else if(_state != MotionVisorState::Error) {
-                _state = MotionVisorState::Idle;
+            } else 
+            {
+                if(_state != MotionVisorState::Error) 
+                {
+                    _state = MotionVisorState::Idle;
+                }
+                digitalWrite(enPin, HIGH); // disable stepper
             }
             cnt = 0;
         }
+    }
+    else
+    {
+        digitalWrite(enPin, HIGH); // disable stepper
     }
 }
 
@@ -71,33 +97,36 @@ MotionVisor::~MotionVisor()
 
 void MotionVisor::loop()
 {
-    if(_state == MotionVisorState::Idle)// if not moving
+    if(!autoHomeFlag)
     {
-        if(isAtEndstop()) // check if the vent state
+        if(_state == MotionVisorState::Idle)// if not moving
         {
-            if(currentStep.has_value())
+            if(isAtEndstop()) // check if the vent state
             {
-                if(currentStep > mmToStep(config.endstopMinDistance))
-                    _state = MotionVisorState::Error; // it should be opened but endstop is sensing a closed state
+                if(currentStep.has_value())
+                {
+                    if(currentStep.value() > mmToStep(config.endstopMinDistance))
+                        _state = MotionVisorState::Error; // it should be opened but endstop is sensing a closed state
+                }
+                else
+                {
+                    currentStep = 0; // closed state
+                    _state = MotionVisorState::Idle;
+                }
             }
             else
             {
-                currentStep = 0; // closed state
-                _state = MotionVisorState::Idle;
+                if(currentStep.has_value())
+                {
+                    if(currentStep.value() == 0)
+                        _state = MotionVisorState::Error; // it should be closed but endstop ain't sensing a closed state
+                }
             }
         }
-        else
+        if(_state == MotionVisorState::Closing and isAtEndstop()) // to avoid mechanical damage if reached endstop sooner than expected
         {
-            if(currentStep.has_value())
-            {
-                if(currentStep == 0)
-                    _state = MotionVisorState::Error; // it should be closed but endstop ain't sensing a closed state
-            }
+            currentStep = 0;
         }
-    }
-    if(_state == MotionVisorState::Closing and isAtEndstop()) // to avoid mechanical damage if reached endstop sooner than expected
-    {
-        currentStep = 0;
     }
 }
 
@@ -108,7 +137,7 @@ unsigned long MotionVisor::mmToStep(double mm)
 
 void MotionVisor::setVentingPercent(int percent)
 {
-    if(currentStep.has_value()) // if autoHomed
+    if(currentStep.has_value() and _state != MotionVisorState::Error) // if autoHomed
     {
         if(percent > 100) percent = 100; // upper limit
         if(percent < 10) percent = 0; // lower limit
