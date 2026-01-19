@@ -3,8 +3,8 @@
 
 struct MotionVisorConfig
 {
-    bool invertDir = false; // based on motor connection
-    bool invertEndstopPin = false; // based on sensor type
+    bool invertDir = true; // based on motor connection
+    bool invertEndstopPin = true; // based on sensor type
     double endstopMinDistance = 5; // minimum required distance to release endstop
     double stepPermm = 200.0; // step count per each mm of movement
     double speed = 8; // mm/s
