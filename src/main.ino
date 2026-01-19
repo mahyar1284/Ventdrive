@@ -49,6 +49,8 @@ void setup()
                 if(doc.containsKey("maxCompensation")) mvConfig.maxCompensation = doc["maxCompensation"].as<double>();
                 if(doc.containsKey("endstopMinDistance")) mvConfig.endstopMinDistance = doc["endstopMinDistance"].as<double>();
                 if(doc.containsKey("ventingPercent")) motionVisor.setVentingPercent(doc["ventingPercent"].as<int>());
+                if(doc.containsKey("invertDir")) mvConfig.invertDir = doc["invertDir"].as<bool>();
+                if(doc.containsKey("invertEndstopPin")) mvConfig.invertEndstopPin = doc["invertEndstopPin"].as<bool>();
                 if((doc["autoHomeFlag"] | false) == true) motionVisor.autoHome();
                 motionVisor.setConfig(mvConfig);
                 
