@@ -6,6 +6,10 @@
 #include <ArduinoJson.h>
 #include <optional>
 
+#define PAIR_BTN PB12
+#define COM_LED PB3
+#define LOOP_LED PC13
+
 void setup() 
 {
     delay(500); // startup delay
@@ -20,7 +24,10 @@ void setup()
     Serial.println("id: 123456789"); // id for device identification
     Serial.println("------------------------------------------\n\n");
     
-    pinMode(PB12, INPUT_PULLUP); // pairing and discovery button.
+    pinMode(PAIR_BTN, INPUT_PULLUP); // pairing and discovery button.
+    pinMode(LOOP_LED, OUTPUT);
+    pinMode(COM_LED, OUTPUT);
+    digitalWrite(LOOP_LED, LOW); // LED on
     MotionVisor motionVisor;
     // motionVisor.autoHome();
     FusionBusSlave fusionBus("Ventdrive");
@@ -33,6 +40,7 @@ void setup()
             // process json commands
             if(doc["id"].as<uint32_t>() == 123456789) // Only process if id Matches,
             {
+                digitalWrite(COM_LED, HIGH);
                 auto mvConfig = motionVisor.getConfig();
                 if(doc.containsKey("acceleration")) mvConfig.acceleration = doc["acceleration"].as<double>();
                 if(doc.containsKey("speed")) mvConfig.speed = doc["speed"].as<double>();
@@ -71,7 +79,7 @@ void setup()
     }); 
     fusionBus.onPair([&]() -> std::optional<std::string> 
     {
-        if(!digitalRead(PB12)) // if pairing button is pushed
+        if(!digitalRead(PAIR_BTN)) // if pairing button is pushed
         {
             const auto id = 123456789;
             JsonDocument doc;
@@ -85,18 +93,17 @@ void setup()
     });
     fusionBus.begin(38400);
 
-    // if(motionVisor.state() == MotionVisorState::Closed)
-    //     motionVisor.open();
-    // if(motionVisor.state() == MotionVisorState::Opened)
-    //     motionVisor.close();
-    
-    pinMode(PC13, OUTPUT);
-    digitalWrite(PC13, LOW); // onboard LED on
+    long long loopLedMillis = 0;
     while(true)
     {
         fusionBus.loop();
+        digitalWrite(COM_LED, LOW);
         motionVisor.loop();
-        digitalToggle(PC13);
+        if(loopLedMillis + 1000 < millis())
+        {
+            digitalToggle(LOOP_LED);
+            loopLedMillis = millis();
+        }
         // if(motionVisor.state() == MotionVisorState::Closed)
         //     Serial.println("state: Closed");
         // if(motionVisor.state() == MotionVisorState::Opened)
