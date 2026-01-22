@@ -7,6 +7,11 @@
 class MotionVisor
 {
 public:
+    enum class Direction
+    {
+        Forward,
+        Backward
+    };
     MotionVisor();
     ~MotionVisor();
 
@@ -23,6 +28,9 @@ private:
     void stepperAsyncLoop();
     unsigned long mmToStep(double mm);
     bool isAtEndstop();
+    void disableStepper();
+    void enableStepper();
+    void moveOneStep(Direction direction);
 
     HardwareTimer timer;
     MotionVisorState _state = MotionVisorState::Uninitialized;

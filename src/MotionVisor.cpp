@@ -20,15 +20,13 @@ void MotionVisor::stepperAsyncLoop()
         static int extraStepsCounter = 0;
         static int cnt;
         unsigned long delay = (unsigned long)(10000.0 / (config.speed * config.stepPermm));
-        digitalWrite(enPin, LOW);
-        digitalWrite(dirPin, config.invertDir ? LOW : HIGH);
+        enableStepper();
         if(cnt++ > delay)
         {
             if(goalStep < 0 and !isAtEndstop())
             {
                 goalStep ++;
-                digitalWrite(stepPin, HIGH); // rotate 1 step
-                digitalWrite(stepPin, LOW); // rotate 1 step
+                moveOneStep(Direction::Backward);
             }
             else 
             {
@@ -44,8 +42,7 @@ void MotionVisor::stepperAsyncLoop()
                     }
                     else
                     {
-                        digitalWrite(stepPin, HIGH); // rotate an extra step
-                        digitalWrite(stepPin, LOW);
+                        moveOneStep(Direction::Backward); // take extra steps to reach endstopExtraDistance 
                     }
                 }
                 else
@@ -71,18 +68,15 @@ void MotionVisor::stepperAsyncLoop()
         {
             if(currentStep.value() < goalStep) 
             {
-                digitalWrite(enPin, LOW);
-                digitalWrite(dirPin, config.invertDir ? HIGH : LOW);
-                digitalWrite(stepPin, HIGH); // rotate 1 step
-                digitalWrite(stepPin, LOW); // rotate 1 step
+                enableStepper();
+                moveOneStep(Direction::Forward);
                 currentStep = currentStep.value() + 1;
                 _state = MotionVisorState::Opening;
-            } else if(currentStep.value() > goalStep and !isAtEndstop()) 
+            } 
+            else if(currentStep.value() > goalStep and !isAtEndstop()) 
             {
-                digitalWrite(enPin, LOW);
-                digitalWrite(dirPin, config.invertDir ? LOW : HIGH);
-                digitalWrite(stepPin, HIGH); // rotate 1 step
-                digitalWrite(stepPin, LOW); // rotate 1 step
+                enableStepper();
+                moveOneStep(Direction::Backward);
                 currentStep = currentStep.value() - 1;
                 _state = MotionVisorState::Closing;
             } 
@@ -96,9 +90,8 @@ void MotionVisor::stepperAsyncLoop()
                 }
                 else // rotate an extra step until extraStepsCounter reaches mmToStep(endstopExtraDistance)
                 {
-                    digitalWrite(dirPin, config.invertDir ? LOW : HIGH);
-                    digitalWrite(stepPin, HIGH);
-                    digitalWrite(stepPin, LOW);
+                    enableStepper();
+                    moveOneStep(Direction::Backward);
                 }
             }
             else 
@@ -107,14 +100,14 @@ void MotionVisor::stepperAsyncLoop()
                 {
                     _state = MotionVisorState::Idle;
                 }
-                digitalWrite(enPin, HIGH); // disable stepper
+                disableStepper();
             }
             cnt = 0;
         }
     }
     else
     {
-        digitalWrite(enPin, HIGH); // disable stepper
+        disableStepper();
     }
 }
 
@@ -212,4 +205,24 @@ void MotionVisor::setConfig(const MotionVisorConfig &config)
 bool MotionVisor::isAtEndstop()
 {
     return config.invertEndstopPin ? !digitalRead(endstopPin) : digitalRead(endstopPin);
+}
+
+void MotionVisor::disableStepper()
+{
+    digitalWrite(enPin, HIGH);
+}
+
+void MotionVisor::enableStepper()
+{
+    digitalWrite(enPin, LOW);
+}
+
+void MotionVisor::moveOneStep(Direction direction)
+{
+    if(direction == Direction::Forward)
+        digitalWrite(dirPin, config.invertDir ? HIGH : LOW);
+    else
+        digitalWrite(dirPin, config.invertDir ? LOW : HIGH);
+    digitalWrite(stepPin, HIGH); // rotate 1 step
+    digitalWrite(stepPin, LOW);
 }
