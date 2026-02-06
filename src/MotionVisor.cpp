@@ -127,7 +127,10 @@ void MotionVisor::loop()
                 if(currentStep.has_value())
                 {
                     if(currentStep.value() > mmToStep(config.endstopExtraDistance))
+                    {
                         _state = MotionVisorState::Error; // it should be opened but endstop is sensing a closed state
+                        currentStep = std::nullopt;
+                    }
                 }
                 else
                 {
@@ -140,7 +143,10 @@ void MotionVisor::loop()
                 if(currentStep.has_value())
                 {
                     if(currentStep.value() == 0)
+                    {
                         _state = MotionVisorState::Error; // it should be closed but endstop ain't sensing a closed state
+                        currentStep = std::nullopt;
+                    }
                 }
             }
         }
@@ -185,6 +191,7 @@ void MotionVisor::autoHome()
         if(!isAtEndstop())
         {
             autoHomeFlag = true;
+            currentStep = std::nullopt;
             _state = MotionVisorState::Closing;
             goalStep = -mmToStep(config.length + config.maxCompensation);
         }
