@@ -51,8 +51,9 @@ void SystemFacade::begin()
                 if(doc.containsKey("ventingPercent")) motionVisor.setVentingPercent(doc["ventingPercent"].as<int>());
                 if(doc.containsKey("invertDir")) mvConfig.invertDir = doc["invertDir"].as<bool>();
                 if(doc.containsKey("invertEndstopPin")) mvConfig.invertEndstopPin = doc["invertEndstopPin"].as<bool>();
-                if((doc["autoHomeFlag"] | false) == true) motionVisor.autoHome();
                 motionVisor.setConfig(mvConfig);
+                
+                if((doc["autoHomeFlag"] | false) == true) motionVisor.autoHome();
                 
                 JsonDocument responseDoc;
                 if(motionVisor.state() == MotionVisorState::Closing)
