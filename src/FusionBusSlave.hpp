@@ -49,6 +49,7 @@ public:
 
     void loop() 
     {
+        uartRecoverIfNeeded();
         while (serial_.available()) 
         {
             const char c = static_cast<char>(serial_.read());
@@ -57,6 +58,20 @@ public:
         checkTimeouts();
         flushRespondIfPending();
     }
+
+    static inline void uartRecoverIfNeeded() 
+    {
+        uint32_t sr = USART1->SR;
+
+        if (sr & (USART_SR_ORE | USART_SR_FE | USART_SR_NE | USART_SR_PE)) 
+        {
+            volatile uint32_t dummy;
+            dummy = sr;           // read SR first
+            dummy = USART1->DR;   // read DR clears the error
+            (void)dummy;
+        }
+    }
+
 
     void onCommunicate(Callback cb) 
     {
